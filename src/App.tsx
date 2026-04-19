@@ -1,19 +1,21 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, Suspense } from 'react'
+import { Canvas } from '@react-three/fiber'
 import maplibregl from 'maplibre-gl'
 import { MapRegionSelector } from './components/MapRegionSelector'
 import { HexGridPreview } from './components/HexGridPreview'
+import { HexMap3D } from './components/HexMap3D'
 import type { RegionSelection } from './lib/types'
 import type { HexGrid } from './lib/hex-grid'
-import type { ElevationData } from './lib/elevation'
 
 type PipelineState = 'idle' | 'loading' | 'ready' | 'error'
+type ViewMode = '2d' | '3d'
 
 function App() {
   const [pipelineState, setPipelineState] = useState<PipelineState>('idle')
+  const [viewMode, setViewMode] = useState<ViewMode>('2d')
   const [hexGrid, setHexGrid] = useState<HexGrid | null>(null)
   const [mapRef, setMapRef] = useState<maplibregl.Map | null>(null)
   const [statusMsg, setStatusMsg] = useState('')
-  const [cellCount, setCellCount] = useState(0)
 
   const handleConfirm = useCallback(async (selection: RegionSelection) => {
     setPipelineState('loading')
@@ -21,32 +23,30 @@ function App() {
     setStatusMsg('Buscando dados de elevação...')
 
     try {
-      // Dynamic imports to keep initial load fast
       const { fetchElevation } = await import('./lib/elevation')
       const { fetchFeatures } = await import('./lib/features')
       const { generateHexGrid } = await import('./lib/hex-grid')
 
-      // 1. Fetch elevation
-      const elevationData: ElevationData = await fetchElevation(selection.bounds, 12)
+      const elevationData = await fetchElevation(selection.bounds, 12)
       setStatusMsg('Buscando features geográficas...')
 
-      // 2. Fetch features (can run in parallel with nothing else)
       const features = await fetchFeatures(selection.bounds)
       setStatusMsg('Gerando grid hexagonal...')
 
-      // 3. Generate hex grid
       const grid = generateHexGrid(selection.bounds, elevationData, features, 7)
 
       setHexGrid(grid)
-      setCellCount(grid.cells.length)
       setPipelineState('ready')
-      setStatusMsg(`${grid.cells.length} hexágonos gerados`)
+      setStatusMsg(`${grid.cells.length} hexágonos`)
     } catch (err) {
       console.error('Pipeline error:', err)
       setPipelineState('error')
       setStatusMsg(`Erro: ${err instanceof Error ? err.message : 'desconhecido'}`)
     }
   }, [])
+
+  const terrainCount = hexGrid?.cells.filter((c) => !c.isWater).length ?? 0
+  const waterCount = hexGrid?.cells.filter((c) => c.isWater).length ?? 0
 
   return (
     <div className="h-screen flex flex-col bg-background text-foreground">
@@ -57,27 +57,71 @@ function App() {
             Selecione uma região para converter em grid hexagonal
           </p>
         </div>
-        <div className="text-right">
+        <div className="flex items-center gap-4">
+          {/* Pipeline status */}
           {pipelineState === 'loading' && (
             <div className="text-sm text-yellow-500 animate-pulse">{statusMsg}</div>
           )}
           {pipelineState === 'ready' && (
             <div className="text-sm text-green-500">
-              ✅ {cellCount} hexágonos (resolução h3: 7)
+              ✅ {hexGrid?.cells.length} hexágonos · {terrainCount} terra · {waterCount} água
             </div>
           )}
           {pipelineState === 'error' && (
             <div className="text-sm text-red-500">❌ {statusMsg}</div>
           )}
+
+          {/* View toggle */}
+          {pipelineState === 'ready' && (
+            <div className="flex border rounded-md overflow-hidden">
+              <button
+                onClick={() => setViewMode('2d')}
+                className={`px-3 py-1 text-sm transition-colors ${
+                  viewMode === '2d'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background hover:bg-accent'
+                }`}
+              >
+                2D Map
+              </button>
+              <button
+                onClick={() => setViewMode('3d')}
+                className={`px-3 py-1 text-sm transition-colors ${
+                  viewMode === '3d'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background hover:bg-accent'
+                }`}
+              >
+                3D View
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
       <main className="flex-1 relative">
-        <MapRegionSelector
-          onConfirm={handleConfirm}
-          onMapLoad={setMapRef}
-        />
-        {mapRef && <HexGridPreview map={mapRef} grid={hexGrid} />}
+        {/* 2D Map (always mounted, hidden when 3D active) */}
+        <div className={viewMode === '2d' ? 'absolute inset-0' : 'hidden'}>
+          <MapRegionSelector onConfirm={handleConfirm} onMapLoad={setMapRef} />
+          {mapRef && <HexGridPreview map={mapRef} grid={hexGrid} />}
+        </div>
+
+        {/* 3D View */}
+        {viewMode === '3d' && hexGrid && (
+          <div className="absolute inset-0 bg-slate-900">
+            <Canvas
+              camera={{ position: [0, 50, 50], fov: 50 }}
+              gl={{ antialias: true }}
+            >
+              <Suspense fallback={null}>
+                <HexMap3D grid={hexGrid} />
+              </Suspense>
+            </Canvas>
+            <div className="absolute bottom-4 left-4 bg-background/90 backdrop-blur-sm border rounded-lg px-4 py-2 text-xs text-muted-foreground">
+              🖱️ Orbit: arrastar · Zoom: scroll · Pan: botão direito
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )
