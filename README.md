@@ -1,73 +1,60 @@
-# React + TypeScript + Vite
+# 🗺️ POC — Mapa Hexagonal de Região Real
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Prova de conceito: renderizar uma região real do mapa mundial como mapa hexagonal estilizado.
 
-Currently, two official plugins are available:
+## Quick Start
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+# Local
+npm install
+npm run dev
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Docker
+docker compose up dev       # desenvolvimento
+docker compose up prod      # preview produção (http://localhost:3000)
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Scripts
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Comando | Descrição |
+|---------|-----------|
+| `npm run dev` | Dev server com hot-reload |
+| `npm run build` | Build de produção |
+| `npm run preview` | Preview do build local |
+| `npm test` | Testes unitários (vitest) |
+| `npm run test:watch` | Testes em watch mode |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | TypeScript check |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Stack
+
+- **Vite** + **React** + **TypeScript**
+- **Tailwind CSS** v4
+- **Three.js** + **React Three Fiber** (3D)
+- **MapLibre GL** (2D map)
+- **h3-js** (hex grid indexing)
+
+## Project Structure
+
 ```
+src/
+├── components/     # React components
+├── hooks/          # Custom hooks
+├── lib/            # Core logic (geo pipeline, hex grid, etc.)
+├── shaders/        # GLSL shader files
+├── test/           # Test files
+└── App.tsx         # Entry point
+```
+
+## Workflow
+
+Projeto usa [OpenSpec](https://openspec.dev/) para spec-driven development.
+Veja `CONTRIBUTING.md` para convenções de branch, commits e PRs.
+
+## Docker Services
+
+| Service | URL | Descrição |
+|---------|-----|-----------|
+| `dev` | http://localhost:5173 | Dev server (hot-reload) |
+| `prod` | http://localhost:3000 | Production preview (nginx) |
+| `cors-proxy` | http://localhost:8080 | CORS proxy for APIs |
