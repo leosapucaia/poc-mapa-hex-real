@@ -10,6 +10,16 @@ import type { HexGrid } from './lib/hex-grid'
 type PipelineState = 'idle' | 'loading' | 'ready' | 'error'
 type ViewMode = '2d' | '3d'
 
+// Pre-set demo region: Rio de Janeiro (small area for fast loading)
+const DEMO_REGION: RegionSelection = {
+  bounds: {
+    sw: { lat: -23.05, lng: -43.75 },
+    ne: { lat: -22.80, lng: -43.10 },
+  },
+  center: { lat: -22.925, lng: -43.425 },
+  sizeKm: { width: 65, height: 28 },
+}
+
 function App() {
   const [pipelineState, setPipelineState] = useState<PipelineState>('idle')
   const [viewMode, setViewMode] = useState<ViewMode>('2d')
@@ -17,7 +27,7 @@ function App() {
   const [mapRef, setMapRef] = useState<maplibregl.Map | null>(null)
   const [statusMsg, setStatusMsg] = useState('')
 
-  const handleConfirm = useCallback(async (selection: RegionSelection) => {
+  const runPipeline = useCallback(async (selection: RegionSelection) => {
     setPipelineState('loading')
     setHexGrid(null)
     setStatusMsg('Buscando dados de elevação...')
@@ -45,6 +55,10 @@ function App() {
     }
   }, [])
 
+  const handleDemo = useCallback(() => {
+    runPipeline(DEMO_REGION)
+  }, [runPipeline])
+
   const terrainCount = hexGrid?.cells.filter((c) => !c.isWater).length ?? 0
   const waterCount = hexGrid?.cells.filter((c) => c.isWater).length ?? 0
 
@@ -58,17 +72,32 @@ function App() {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          {/* Demo button */}
+          {pipelineState !== 'loading' && (
+            <button
+              onClick={handleDemo}
+              data-testid="demo-button"
+              className="px-3 py-1.5 text-sm border border-dashed rounded-md hover:bg-accent transition-colors text-muted-foreground"
+            >
+              ⚡ Demo (Rio de Janeiro)
+            </button>
+          )}
+
           {/* Pipeline status */}
           {pipelineState === 'loading' && (
-            <div className="text-sm text-yellow-500 animate-pulse">{statusMsg}</div>
+            <div className="text-sm text-yellow-500 animate-pulse" data-testid="status-loading">
+              {statusMsg}
+            </div>
           )}
           {pipelineState === 'ready' && (
-            <div className="text-sm text-green-500">
+            <div className="text-sm text-green-500" data-testid="status-ready">
               ✅ {hexGrid?.cells.length} hexágonos · {terrainCount} terra · {waterCount} água
             </div>
           )}
           {pipelineState === 'error' && (
-            <div className="text-sm text-red-500">❌ {statusMsg}</div>
+            <div className="text-sm text-red-500" data-testid="status-error">
+              ❌ {statusMsg}
+            </div>
           )}
 
           {/* View toggle */}
@@ -76,6 +105,7 @@ function App() {
             <div className="flex border rounded-md overflow-hidden">
               <button
                 onClick={() => setViewMode('2d')}
+                data-testid="view-2d"
                 className={`px-3 py-1 text-sm transition-colors ${
                   viewMode === '2d'
                     ? 'bg-primary text-primary-foreground'
@@ -86,6 +116,7 @@ function App() {
               </button>
               <button
                 onClick={() => setViewMode('3d')}
+                data-testid="view-3d"
                 className={`px-3 py-1 text-sm transition-colors ${
                   viewMode === '3d'
                     ? 'bg-primary text-primary-foreground'
@@ -102,7 +133,7 @@ function App() {
       <main className="flex-1 relative">
         {/* 2D Map (always mounted, hidden when 3D active) */}
         <div className={viewMode === '2d' ? 'absolute inset-0' : 'hidden'}>
-          <MapRegionSelector onConfirm={handleConfirm} onMapLoad={setMapRef} />
+          <MapRegionSelector onConfirm={runPipeline} onMapLoad={setMapRef} />
           {mapRef && <HexGridPreview map={mapRef} grid={hexGrid} />}
         </div>
 
