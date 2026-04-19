@@ -1,0 +1,42 @@
+name: PR Agent Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR diff
+        id: diff
+        run: |
+          DIFF=$(git diff origin/main...HEAD)
+          echo "DIFF<<EOF" >> $GITHUB_OUTPUT
+          echo "$DIFF" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Get changed files
+        id: files
+        run: |
+          FILES=$(git diff --name-only origin/main...HEAD)
+          echo "FILES<<EOF" >> $GITHUB_OUTPUT
+          echo "$FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # This job prepares context for the orchestrator (Hermes)
+      # The actual review is done by a subagent dispatched by the orchestrator
+      # Triggered via webhook or manual dispatch
+      - name: Output context
+        run: |
+          echo "### PR Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.head_ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Changed files:**" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.files.outputs.FILES }}" >> $GITHUB_STEP_SUMMARY
