@@ -7,11 +7,12 @@ import { createRegionSelection } from '../lib/geo'
 interface MapRegionSelectorProps {
   onSelectionChange?: (selection: RegionSelection | null) => void
   onConfirm?: (selection: RegionSelection) => void
+  onMapLoad?: (map: maplibregl.Map) => void
 }
 
 type DrawState = 'idle' | 'drawing' | 'selected'
 
-export function MapRegionSelector({ onSelectionChange, onConfirm }: MapRegionSelectorProps) {
+export function MapRegionSelector({ onSelectionChange, onConfirm, onMapLoad }: MapRegionSelectorProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const startRef = useRef<{ lng: number; lat: number } | null>(null)
@@ -118,6 +119,7 @@ export function MapRegionSelector({ onSelectionChange, onConfirm }: MapRegionSel
 
     map.on('load', () => {
       initLayers(map)
+      onMapLoad?.(map)
     })
 
     // --- Drawing handlers ---
