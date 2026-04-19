@@ -19,14 +19,14 @@ jobs:
 
       - run: npm ci
 
+      - name: Type Check
+        run: npm run typecheck
+
       - name: Lint
         run: npm run lint
 
-      - name: Type Check
-        run: npx tsc --noEmit
+      - name: Unit Tests
+        run: npm test
 
       - name: Build
         run: npm run build
-
-      - name: Unit Tests
-        run: npx vitest run --passWithNoTests 2>/dev/null || echo "No tests yet — skipping"
