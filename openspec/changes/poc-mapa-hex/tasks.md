@@ -1,11 +1,11 @@
-## 1. Project Scaffolding
+## 1. Project Scaffolding ✅
 
-- [ ] 1.1 Initialize Vite + React + TypeScript project
-- [ ] 1.2 Install dependencies: react, three.js, @react-three/fiber, @react-three/drei, h3-js, maplibre-gl, tailwindcss
-- [ ] 1.3 Configure Tailwind CSS + base shadcn/ui setup
-- [ ] 1.4 Create folder structure: src/components/, src/lib/, src/shaders/, src/hooks/
-- [ ] 1.5 Create base App component with placeholder layout
-- [ ] 1.6 Verify dev server runs (`npm run dev`)
+- [x] 1.1 Initialize Vite + React + TypeScript project
+- [x] 1.2 Install dependencies: react, three.js, @react-three/fiber, @react-three/drei, h3-js, maplibre-gl, tailwindcss
+- [x] 1.3 Configure Tailwind CSS (v4 @tailwindcss/vite plugin)
+- [x] 1.4 Create folder structure: src/components/, src/lib/, src/shaders/, src/hooks/
+- [x] 1.5 Create base App component with placeholder layout
+- [x] 1.6 Verify build + type-check + lint pass (CI green)
 
 ## 2. Region Selector (MapCN/MapLibre)
 
