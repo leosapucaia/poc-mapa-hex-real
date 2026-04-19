@@ -7,13 +7,13 @@
 - [x] 1.5 Create base App component with placeholder layout
 - [x] 1.6 Verify build + type-check + lint pass (CI green)
 
-## 2. Region Selector (MapCN/MapLibre)
+## 2. Region Selector (MapLibre) ✅
 
-- [ ] 2.1 Create MapLibre map component with OSM tiles
-- [ ] 2.2 Add bounding box drawing/selection tool
-- [ ] 2.3 Display selected coordinates in UI
-- [ ] 2.4 Add confirm button that emits bounding box
-- [ ] 2.5 Style with Tailwind/shadcn patterns
+- [x] 2.1 Create MapLibre map component with OSM tiles
+- [x] 2.2 Add bounding box drawing/selection tool (click-and-drag)
+- [x] 2.3 Display selected coordinates in UI (info panel)
+- [x] 2.4 Add confirm button that emits bounding box
+- [x] 2.5 Style with Tailwind/shadcn patterns
 
 ## 3. Geo Data Pipeline — Elevation
 
