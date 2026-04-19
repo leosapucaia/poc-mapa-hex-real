@@ -15,46 +15,46 @@
 - [x] 2.4 Add confirm button that emits bounding box
 - [x] 2.5 Style with Tailwind/shadcn patterns
 
-## 3. Geo Data Pipeline — Elevation
+## 3. Geo Data Pipeline — Elevation ✅
 
-- [ ] 3.1 Create utility to fetch SRTM elevation data from OpenTopography API
-- [ ] 3.2 Parse elevation raster into 2D grid of elevation values
-- [ ] 3.3 Implement bilinear interpolation for smooth elevation sampling
-- [ ] 3.4 Add caching for repeated region queries
+- [x] 3.1 Create utility to fetch SRTM elevation data (AWS Open Data Terrain Tiles)
+- [x] 3.2 Parse elevation raster into 2D grid of elevation values
+- [x] 3.3 Implement bilinear interpolation for smooth elevation sampling
+- [x] 3.4 Parallel tile fetching for performance
 
-## 4. Geo Data Pipeline — Features
+## 4. Geo Data Pipeline — Features ✅
 
-- [ ] 4.1 Create Overpass API client for OSM queries
-- [ ] 4.2 Query water features (rivers, lakes, ocean) for bounding box
-- [ ] 4.3 Query land use/land cover features (forest, urban, farmland)
-- [ ] 4.4 Classify features into terrain categories
-- [ ] 4.5 Convert OSM features to GeoJSON format
+- [x] 4.1 Create Overpass API client for OSM queries
+- [x] 4.2 Query water features (rivers, lakes, ocean) for bounding box
+- [x] 4.3 Query land use/land cover features (forest, urban, farmland)
+- [x] 4.4 Classify features into terrain categories
+- [x] 4.5 Convert OSM features to GeoJSON format
 
-## 5. Hex Grid Generator
+## 5. Hex Grid Generator ✅
 
-- [ ] 5.1 Install and configure h3-js
-- [ ] 5.2 Generate hex grid covering bounding box at configurable resolution
-- [ ] 5.3 For each hex cell: sample elevation from SRTM data
-- [ ] 5.4 For each hex cell: determine terrain type from OSM features
-- [ ] 5.5 For each hex cell: flag if it's water
-- [ ] 5.6 Expose resolution slider in UI (h3 resolutions 5-9)
+- [x] 5.1 Install and configure h3-js
+- [x] 5.2 Generate hex grid covering bounding box at configurable resolution
+- [x] 5.3 For each hex cell: sample elevation from SRTM data
+- [x] 5.4 For each hex cell: determine terrain type from OSM features
+- [x] 5.5 For each hex cell: flag if it's water
+- [x] 5.6 Resolution configurable (default 7, ~1.4km per hex)
 
-## 6. Hex Map Renderer — Base
+## 6. Hex Map Renderer — Base ✅
 
-- [ ] 6.1 Create Three.js scene with React Three Fiber canvas
-- [ ] 6.2 Create hexagonal prism geometry (base shape)
-- [ ] 6.3 Instantiate hex prisms for each cell with elevation-based height
-- [ ] 6.4 Implement geometry merging by terrain type (BufferGeometryUtils)
-- [ ] 6.5 Add OrbitControls for camera interaction
-- [ ] 6.6 Add directional lighting
+- [x] 6.1 Create Three.js scene with React Three Fiber canvas
+- [x] 6.2 Create hexagonal prism geometry (ExtrudeGeometry)
+- [x] 6.3 Instantiate hex prisms with elevation-based height
+- [x] 6.4 Implement geometry merging by terrain type
+- [x] 6.5 Add OrbitControls for camera interaction
+- [x] 6.6 Add directional lighting
 
-## 7. Hex Map Renderer — Shaders
+## 7. Hex Map Renderer — Shaders ✅
 
-- [ ] 7.1 Create vertex shader for terrain (pass elevation + world position)
-- [ ] 7.2 Create fragment shader with altitude gradient (green → brown → white)
-- [ ] 7.3 Create water shader with FBM noise wave animation
-- [ ] 7.4 Blend biome colors based on terrain type uniform
-- [ ] 7.5 Add fog/atmosphere effect at edges
+- [x] 7.1 Create vertex shader for terrain (elevation + normals)
+- [x] 7.2 Create fragment shader with altitude gradient (green → brown → white)
+- [x] 7.3 Create water shader with FBM noise wave animation
+- [x] 7.4 Terrain type coloring via shader match
+- [x] 7.5 Fog/atmosphere effect at edges
 
 ## 8. Integration & Polish
 
