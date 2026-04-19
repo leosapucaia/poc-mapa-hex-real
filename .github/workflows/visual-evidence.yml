@@ -44,33 +44,45 @@ jobs:
             const path = require('path');
 
             const screenshotsDir = 'e2e-screenshots';
-            if (!fs.existsSync(screenshotsDir)) return;
+            if (!fs.existsSync(screenshotsDir)) {
+              console.log('No screenshots directory found');
+              return;
+            }
 
             const files = fs.readdirSync(screenshotsDir).filter(f => f.endsWith('.png'));
-            if (files.length === 0) return;
+            if (files.length === 0) {
+              console.log('No screenshot files found');
+              return;
+            }
+
+            const prNumber = context.payload.pull_request?.number;
+            if (!prNumber) {
+              console.log('No PR number found');
+              return;
+            }
 
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const artifactsUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}#artifacts`;
 
             let body = '## 📸 Visual Evidence\n\n';
-            body += `Screenshots captured from PR #${context.issue?.number || 'preview'}\n\n`;
+            body += `Automated screenshots from Playwright\n\n`;
 
             for (const file of files.sort()) {
               const label = file.replace('.png', '').replace(/^\d+-/, '').replace(/-/g, ' ');
-              body += `### ${label}\n`;
-              body += `![${file}](${runUrl}#step:5:1)\n\n`;
+              body += `**${label}** — \`${file}\`\n\n`;
             }
 
-            body += `🔗 [Download all screenshots](${runUrl}#artifacts)\n`;
+            body += `🔗 [Download screenshots](${artifactsUrl})`;
 
-            // Find and update existing comment or create new
+            // Find existing comment to update
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue?.number || context.payload.pull_request?.number,
+              issue_number: prNumber,
             });
 
             const existing = comments.find(c =>
-              c.user.type === 'Bot' && c.body.includes('📸 Visual Evidence')
+              c.user.type === 'Bot' && c.body?.includes('Visual Evidence')
             );
 
             if (existing) {
@@ -80,11 +92,13 @@ jobs:
                 comment_id: existing.id,
                 body,
               });
+              console.log('Updated existing comment');
             } else {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: context.issue?.number || context.payload.pull_request?.number,
+                issue_number: prNumber,
                 body,
               });
+              console.log('Created new comment');
             }
