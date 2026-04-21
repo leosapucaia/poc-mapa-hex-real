@@ -17,42 +17,35 @@ const TERRAIN_COLORS: Record<string, string> = {
 }
 
 export function HexGridPreview({ map, grid }: HexGridPreviewProps) {
-  const sourceAdded = useRef(false)
+  const SOURCE_ID = 'hex-grid-source'
+  const LAYER_ID = 'hex-grid-fill'
+  const OUTLINE_ID = 'hex-grid-outline'
+  const isMounted = useRef(true)
+
+  const createGeoJson = (nextGrid: HexGrid): GeoJSON.FeatureCollection<GeoJSON.Polygon> => ({
+    type: 'FeatureCollection',
+    features: nextGrid.cells.map((cell) => ({
+      type: 'Feature',
+      properties: {
+        elevation: cell.elevation,
+        terrain: cell.terrain,
+        isWater: cell.isWater,
+      },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [...cell.boundary.map((b) => [b.lng, b.lat] as [number, number]), [cell.boundary[0].lng, cell.boundary[0].lat]],
+        ],
+      },
+    })),
+  })
 
   useEffect(() => {
-    if (!grid || !map) return
+    const ensureSourceAndLayers = () => {
+      if (!isMounted.current) return
+      if (map.getSource(SOURCE_ID)) return
 
-    const SOURCE_ID = 'hex-grid-source'
-    const LAYER_ID = 'hex-grid-fill'
-    const OUTLINE_ID = 'hex-grid-outline'
-
-    // Build GeoJSON from grid cells
-    const geojson: GeoJSON.FeatureCollection<GeoJSON.Polygon> = {
-      type: 'FeatureCollection',
-      features: grid.cells.map((cell) => ({
-        type: 'Feature',
-        properties: {
-          elevation: cell.elevation,
-          terrain: cell.terrain,
-          isWater: cell.isWater,
-        },
-        geometry: {
-          type: 'Polygon',
-          coordinates: [
-            [...cell.boundary.map((b) => [b.lng, b.lat] as [number, number]), [cell.boundary[0].lng, cell.boundary[0].lat]],
-          ],
-        },
-      })),
-    }
-
-    const addLayers = () => {
-      if (map.getSource(SOURCE_ID)) {
-        // Update existing source
-        ;(map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource).setData(geojson)
-        return
-      }
-
-      map.addSource(SOURCE_ID, { type: 'geojson', data: geojson })
+      map.addSource(SOURCE_ID, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
 
       map.addLayer({
         id: LAYER_ID,
@@ -82,24 +75,33 @@ export function HexGridPreview({ map, grid }: HexGridPreviewProps) {
           'line-width': 0.5,
         },
       })
-
-      sourceAdded.current = true
     }
 
+    isMounted.current = true
     if (map.isStyleLoaded()) {
-      addLayers()
+      ensureSourceAndLayers()
     } else {
-      map.once('load', addLayers)
-      map.once('style.load', addLayers)
+      map.on('load', ensureSourceAndLayers)
+      map.on('style.load', ensureSourceAndLayers)
     }
 
     return () => {
+      isMounted.current = false
+      map.off('load', ensureSourceAndLayers)
+      map.off('style.load', ensureSourceAndLayers)
       if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID)
       if (map.getLayer(OUTLINE_ID)) map.removeLayer(OUTLINE_ID)
       if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID)
-      sourceAdded.current = false
     }
-  }, [map, grid])
+  }, [map])
+
+  useEffect(() => {
+    if (!grid) return
+    const source = map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource | undefined
+    if (!source) return
+
+    source.setData(createGeoJson(grid))
+  }, [grid, map])
 
   return null // MapLibre handles the rendering
 }
