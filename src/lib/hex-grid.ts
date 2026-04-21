@@ -3,7 +3,7 @@ import type { BoundingBox } from './types'
 import type { ElevationData } from './elevation'
 import { sampleElevation } from './elevation'
 import type { GeoFeature, TerrainCategory } from './features'
-import { classifyPoint } from './features'
+import { buildSpatialFeatureIndex, classifyPoint } from './features'
 
 export interface HexCell {
   /** H3 index */
@@ -56,6 +56,9 @@ export function generateHexGrid(
   // Get all cells within radius
   const h3Indices = gridDisk(centerH3, hexRadius)
 
+  // Build spatial index once and query candidates per cell center
+  const featureIndex = buildSpatialFeatureIndex(features)
+
   // Filter to cells within bounds and sample data
   const cells: HexCell[] = []
 
@@ -74,7 +77,7 @@ export function generateHexGrid(
     }
 
     const elevation = sampleElevation(elevationData, cellCenter.lat, cellCenter.lng)
-    const terrain = classifyPoint(cellCenter.lat, cellCenter.lng, features)
+    const terrain = classifyPoint(cellCenter.lat, cellCenter.lng, featureIndex)
     const isWater = terrain === 'water' || elevation < 0
 
     cells.push({
