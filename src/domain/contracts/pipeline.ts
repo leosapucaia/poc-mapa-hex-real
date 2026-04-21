@@ -10,6 +10,10 @@ export interface PipelineConfig {
   hexResolution: number
   retries: number
   retryDelayMs: number
+  backendMode?: {
+    enabled: boolean
+    endpoint: string
+  }
 }
 
 export interface PipelineResult {

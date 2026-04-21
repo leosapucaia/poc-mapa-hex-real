@@ -28,3 +28,28 @@ O pipeline SHALL normalizar os dados geográficos em um formato consistente para
 #### Scenario: Output estruturado
 - **WHEN** o pipeline processa a região
 - **THEN** produz um objeto com: elevation grid (2D array), features GeoJSON classificadas, bounding box
+
+### Requirement: Contrato backend versionado para hex grid
+O sistema SHALL suportar um contrato versionado opcional para geração de hex grid no backend.
+
+#### Scenario: Payload de geração remota
+- **WHEN** o frontend aciona backend de hex grid
+- **THEN** envia payload com `{bbox, resolution, options}`
+
+#### Scenario: Resposta versionada
+- **WHEN** o backend retorna o grid
+- **THEN** a resposta inclui `version` (ex: `v1`), `grid` e metadados de cache/latência
+
+### Requirement: Estratégia de cache geoespacial
+O backend SHALL permitir cache por chave geoespacial normalizada e resolução.
+
+#### Scenario: Derivação da chave de cache
+- **WHEN** uma request é recebida
+- **THEN** a chave deve incluir versão do contrato, resolução e bbox normalizado
+
+### Requirement: Modo híbrido local-first com fallback
+O frontend SHALL executar geração local primeiro e usar backend como fallback opcional em falhas.
+
+#### Scenario: Fallback backend
+- **WHEN** a geração local falha e o backend híbrido está habilitado
+- **THEN** o frontend deve tentar `POST /api/hex-grid` e marcar execução como `backend-fallback`
