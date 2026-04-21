@@ -17,6 +17,7 @@ export function MapRegionSelector({ onSelectionChange, onConfirm, onMapLoad }: M
   const mapRef = useRef<maplibregl.Map | null>(null)
   const startRef = useRef<{ lng: number; lat: number } | null>(null)
   const [drawState, setDrawState] = useState<DrawState>('idle')
+  const drawStateRef = useRef<DrawState>('idle')
   const [selection, setSelection] = useState<RegionSelection | null>(null)
 
   const SOURCE_ID = 'selection-source'
@@ -85,6 +86,10 @@ export function MapRegionSelector({ onSelectionChange, onConfirm, onMapLoad }: M
     })
   }, [])
 
+  useEffect(() => {
+    drawStateRef.current = drawState
+  }, [drawState])
+
   // Initialize map
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
@@ -117,14 +122,14 @@ export function MapRegionSelector({ onSelectionChange, onConfirm, onMapLoad }: M
 
     map.addControl(new maplibregl.NavigationControl(), 'top-right')
 
-    map.on('load', () => {
+    const onLoad = () => {
       initLayers(map)
       onMapLoad?.(map)
-    })
+    }
 
     // --- Drawing handlers ---
-    map.on('mousedown', (e) => {
-      if (drawState !== 'idle') return
+    const handleMouseDown = (e: maplibregl.MapMouseEvent) => {
+      if (drawStateRef.current !== 'idle') return
       e.preventDefault()
 
       startRef.current = { lng: e.lngLat.lng, lat: e.lngLat.lat }
@@ -134,10 +139,10 @@ export function MapRegionSelector({ onSelectionChange, onConfirm, onMapLoad }: M
 
       // Disable map pan while drawing
       map.getCanvas().style.cursor = 'crosshair'
-    })
+    }
 
-    map.on('mousemove', (e) => {
-      if (drawState !== 'drawing' || !startRef.current) return
+    const handleMouseMove = (e: maplibregl.MapMouseEvent) => {
+      if (drawStateRef.current !== 'drawing' || !startRef.current) return
 
       const start = startRef.current
       const current = { lng: e.lngLat.lng, lat: e.lngLat.lat }
@@ -152,10 +157,10 @@ export function MapRegionSelector({ onSelectionChange, onConfirm, onMapLoad }: M
       }
 
       updateRectangle(map, sw, ne)
-    })
+    }
 
-    map.on('mouseup', (e) => {
-      if (drawState !== 'drawing' || !startRef.current) return
+    const handleMouseUp = (e: maplibregl.MapMouseEvent) => {
+      if (drawStateRef.current !== 'drawing' || !startRef.current) return
 
       const start = startRef.current
       const end = { lng: e.lngLat.lng, lat: e.lngLat.lat }
@@ -183,11 +188,20 @@ export function MapRegionSelector({ onSelectionChange, onConfirm, onMapLoad }: M
 
       startRef.current = null
       map.getCanvas().style.cursor = ''
-    })
+    }
+
+    map.on('load', onLoad)
+    map.on('mousedown', handleMouseDown)
+    map.on('mousemove', handleMouseMove)
+    map.on('mouseup', handleMouseUp)
 
     mapRef.current = map
 
     return () => {
+      map.off('load', onLoad)
+      map.off('mousedown', handleMouseDown)
+      map.off('mousemove', handleMouseMove)
+      map.off('mouseup', handleMouseUp)
       map.remove()
       mapRef.current = null
     }
