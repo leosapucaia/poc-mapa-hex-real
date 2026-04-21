@@ -1,13 +1,12 @@
-import { useState, useCallback, Suspense, useRef } from 'react'
+import { useState, useCallback, Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
 import maplibregl from 'maplibre-gl'
 import { MapRegionSelector } from './components/MapRegionSelector'
 import { HexGridPreview } from './components/HexGridPreview'
 import { HexMap3D } from './components/HexMap3D'
 import type { RegionSelection } from './lib/types'
-import type { HexGrid } from './lib/hex-grid'
+import { usePipelineController } from './hooks/usePipelineController'
 
-type PipelineState = 'idle' | 'loading' | 'ready' | 'error'
 type ViewMode = '2d' | '3d'
 
 // Pre-set demo region: Rio de Janeiro (small area for fast loading)
@@ -21,61 +20,9 @@ const DEMO_REGION: RegionSelection = {
 }
 
 function App() {
-  const [pipelineState, setPipelineState] = useState<PipelineState>('idle')
   const [viewMode, setViewMode] = useState<ViewMode>('2d')
-  const [hexGrid, setHexGrid] = useState<HexGrid | null>(null)
   const [mapRef, setMapRef] = useState<maplibregl.Map | null>(null)
-  const [statusMsg, setStatusMsg] = useState('')
-  const requestIdRef = useRef(0)
-  const activeAbortRef = useRef<AbortController | null>(null)
-
-  const runPipeline = useCallback(async (selection: RegionSelection) => {
-    const requestId = requestIdRef.current + 1
-    requestIdRef.current = requestId
-
-    activeAbortRef.current?.abort()
-    const abortController = new AbortController()
-    activeAbortRef.current = abortController
-
-    const isLatestRequest = () => requestIdRef.current === requestId
-
-    setPipelineState('loading')
-    setHexGrid(null)
-    setStatusMsg('Buscando dados de elevação...')
-
-    try {
-      const { fetchElevation } = await import('./lib/elevation')
-      const { fetchFeatures } = await import('./lib/features')
-      const { generateHexGrid } = await import('./lib/hex-grid')
-
-      const elevationData = await fetchElevation(selection.bounds, 12, abortController.signal)
-      if (!isLatestRequest()) return
-      setStatusMsg('Buscando features geográficas...')
-
-      const features = await fetchFeatures(selection.bounds, abortController.signal)
-      if (!isLatestRequest()) return
-      setStatusMsg('Gerando grid hexagonal...')
-
-      const grid = generateHexGrid(selection.bounds, elevationData, features, 7)
-      if (!isLatestRequest()) return
-
-      setHexGrid(grid)
-      setPipelineState('ready')
-      setStatusMsg(`${grid.cells.length} hexágonos`)
-    } catch (err) {
-      if (!isLatestRequest()) return
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        return
-      }
-      console.error('Pipeline error:', err)
-      setPipelineState('error')
-      setStatusMsg(`Erro: ${err instanceof Error ? err.message : 'desconhecido'}`)
-    } finally {
-      if (activeAbortRef.current === abortController) {
-        activeAbortRef.current = null
-      }
-    }
-  }, [])
+  const { pipelineState, hexGrid, statusMsg, runPipeline } = usePipelineController()
 
   const handleDemo = useCallback(() => {
     runPipeline(DEMO_REGION)
