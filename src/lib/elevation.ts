@@ -1,5 +1,7 @@
 import type { BoundingBox } from './types'
 
+const DEFAULT_TILE_FETCH_CONCURRENCY = 8
+
 /** Elevation data as a 2D grid */
 export interface ElevationData {
   /** Grid dimensions */
@@ -39,12 +41,12 @@ export async function fetchElevation(
   const gridHeight = (maxTileY - minTileY + 1) * tileSize
   const values = new Float64Array(gridWidth * gridHeight)
 
-  // Fetch all tiles in parallel
-  const fetches: Promise<void>[] = []
+  // Fetch tiles with bounded parallelism
+  const tasks: Array<() => Promise<void>> = []
   for (let ty = minTileY; ty <= maxTileY; ty++) {
     for (let tx = minTileX; tx <= maxTileX; tx++) {
-        fetches.push(
-        fetchTile(tx, ty, zoom, tileSize, signal).then((pixels) => {
+      tasks.push(async () => {
+        const pixels = await fetchTile(tx, ty, zoom, tileSize, signal)
           if (!pixels) return
           const offsetX = (tx - minTileX) * tileSize
           const offsetY = (ty - minTileY) * tileSize
@@ -59,12 +61,11 @@ export async function fetchElevation(
               values[dstIdx] = elevation
             }
           }
-        })
-      )
+      })
     }
   }
 
-  await Promise.all(fetches)
+  await runWithConcurrencyLimit(tasks, DEFAULT_TILE_FETCH_CONCURRENCY)
 
   return { width: gridWidth, height: gridHeight, values, bounds }
 }
@@ -112,6 +113,29 @@ function latLngToTile(lat: number, lng: number, zoom: number) {
   return { x, y }
 }
 
+export async function runWithConcurrencyLimit(
+  tasks: Array<() => Promise<void>>,
+  concurrencyLimit: number
+): Promise<void> {
+  if (concurrencyLimit < 1) {
+    throw new Error('concurrencyLimit must be at least 1')
+  }
+
+  let nextTaskIndex = 0
+
+  async function worker() {
+    while (nextTaskIndex < tasks.length) {
+      const taskIndex = nextTaskIndex
+      nextTaskIndex += 1
+      await tasks[taskIndex]()
+    }
+  }
+
+  const workerCount = Math.min(concurrencyLimit, tasks.length)
+  const workers = Array.from({ length: workerCount }, () => worker())
+  await Promise.all(workers)
+}
+
 async function fetchTile(
   x: number,
   y: number,
@@ -137,7 +161,10 @@ async function fetchTile(
     bitmap.close()
 
     return ctx.getImageData(0, 0, tileSize, tileSize).data
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return null
+    }
     return null
   }
 }
