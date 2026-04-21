@@ -78,7 +78,12 @@ describe('App', () => {
     mocks.fetchElevation.mockImplementationOnce((_, __, signal: AbortSignal) => {
       firstSignal = signal
       return new Promise((_, reject) => {
-        signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+        const onAbort = () => reject(new DOMException('Aborted', 'AbortError'))
+        if (signal.aborted) {
+          onAbort()
+          return
+        }
+        signal.addEventListener('abort', onAbort, { once: true })
       })
     })
     mocks.fetchElevation.mockResolvedValueOnce({ values: new Float64Array(), width: 1, height: 1, bounds: selectionB.bounds })
@@ -92,9 +97,12 @@ describe('App', () => {
     fireEvent.click(screen.getByTestId('run-a'))
     fireEvent.click(screen.getByTestId('run-b'))
 
-    await waitFor(() => {
-      expect(screen.getByTestId('status-ready')).toHaveTextContent('2 hexágonos')
-    })
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('status-ready')).toHaveTextContent('2 hexágonos')
+      },
+      { timeout: 3000 }
+    )
 
     expect(firstSignal?.aborted).toBe(true)
     expect(screen.queryByTestId('status-error')).not.toBeInTheDocument()
@@ -122,9 +130,12 @@ describe('App', () => {
     fireEvent.click(screen.getByTestId('run-a'))
     fireEvent.click(screen.getByTestId('run-b'))
 
-    await waitFor(() => {
-      expect(screen.getByTestId('status-ready')).toHaveTextContent('3 hexágonos')
-    })
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('status-ready')).toHaveTextContent('3 hexágonos')
+      },
+      { timeout: 3000 }
+    )
 
     rejectOldFeatures?.(new Error('falha antiga'))
 

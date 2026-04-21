@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { fetchElevation, runWithConcurrencyLimit, sampleElevation } from '../lib/elevation'
 import type { ElevationData } from '../lib/elevation'
 import type { BoundingBox } from '../lib/types'
@@ -11,6 +11,10 @@ function makeElevationData(
 ): ElevationData {
   return { width, height, values: new Float64Array(values), bounds }
 }
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 describe('sampleElevation', () => {
   const bounds: BoundingBox = {
@@ -84,6 +88,5 @@ describe('fetchElevation signal handling', () => {
     expect(data.width).toBeGreaterThan(0)
     expect(data.height).toBeGreaterThan(0)
 
-    fetchSpy.mockRestore()
   })
 })
