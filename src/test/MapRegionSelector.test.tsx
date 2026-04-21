@@ -4,9 +4,10 @@ import { MapRegionSelector } from '../components/MapRegionSelector'
 
 type EventName = 'load' | 'mousedown' | 'mousemove' | 'mouseup'
 type LngLatEvent = { lngLat: { lng: number; lat: number }; preventDefault: () => void }
+type MockMapInstance = { emit: (event: EventName, lng: number, lat: number) => void }
 
 const { mapInstances } = vi.hoisted(() => ({
-  mapInstances: [] as any[],
+  mapInstances: [] as MockMapInstance[],
 }))
 
 vi.mock('maplibre-gl', () => {
