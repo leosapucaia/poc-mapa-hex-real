@@ -8,6 +8,7 @@ vi.mock('maplibre-gl', () => {
     default: {
       Map: class {
         on = mockFn()
+        off = mockFn()
         remove = mockFn()
         addControl = mockFn()
         addSource = mockFn()
