@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { MapRegionSelector } from '../components/MapRegionSelector'
 
@@ -72,16 +72,22 @@ describe('MapRegionSelector', () => {
 
     const map = mapInstances.at(-1)
     expect(map).toBeDefined()
-    map!.emit('load', 0, 0)
+    act(() => {
+      map!.emit('load', 0, 0)
+    })
 
     expect(screen.getByText(/Clique e arraste/)).toBeInTheDocument()
 
-    map!.emit('mousedown', -43.2, -22.9)
+    act(() => {
+      map!.emit('mousedown', -43.2, -22.9)
+    })
     await waitFor(() => expect(screen.queryByText(/Clique e arraste/)).not.toBeInTheDocument())
     expect(onSelectionChange).toHaveBeenCalledWith(null)
 
-    map!.emit('mousemove', -42.8, -22.5)
-    map!.emit('mouseup', -42.8, -22.5)
+    act(() => {
+      map!.emit('mousemove', -42.8, -22.5)
+      map!.emit('mouseup', -42.8, -22.5)
+    })
 
     await waitFor(() => expect(screen.getByText(/Região Selecionada/)).toBeInTheDocument())
     expect(onSelectionChange).toHaveBeenLastCalledWith(
@@ -101,10 +107,17 @@ describe('MapRegionSelector', () => {
 
     const map = mapInstances.at(-1)
     expect(map).toBeDefined()
-    map!.emit('load', 0, 0)
+    act(() => {
+      map!.emit('load', 0, 0)
+    })
 
-    map!.emit('mousedown', -43.2, -22.9)
-    map!.emit('mouseup', -43.195, -22.895)
+    act(() => {
+      map!.emit('mousedown', -43.2, -22.9)
+    })
+    await waitFor(() => expect(onSelectionChange).toHaveBeenCalledWith(null))
+    act(() => {
+      map!.emit('mouseup', -43.195, -22.895)
+    })
 
     await waitFor(() => expect(screen.getByText(/Clique e arraste/)).toBeInTheDocument())
     expect(screen.queryByText(/Região Selecionada/)).not.toBeInTheDocument()

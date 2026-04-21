@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { sampleElevation } from '../lib/elevation'
+import { afterEach, describe, it, expect, vi } from 'vitest'
+import { fetchElevation, runWithConcurrencyLimit, sampleElevation } from '../lib/elevation'
 import type { ElevationData } from '../lib/elevation'
 import type { BoundingBox } from '../lib/types'
 
@@ -11,6 +11,10 @@ function makeElevationData(
 ): ElevationData {
   return { width, height, values: new Float64Array(values), bounds }
 }
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 describe('sampleElevation', () => {
   const bounds: BoundingBox = {
@@ -34,5 +38,55 @@ describe('sampleElevation', () => {
     // Center point should be interpolated average
     const center = sampleElevation(data, 0.5, 0.5)
     expect(center).toBeCloseTo(150, 0)
+  })
+})
+
+describe('runWithConcurrencyLimit', () => {
+  it('limits concurrent workers to provided limit', async () => {
+    const concurrencyLimit = 3
+    const totalTasks = 10
+
+    let inFlight = 0
+    let maxInFlight = 0
+
+    const tasks = Array.from({ length: totalTasks }, () => async () => {
+      inFlight += 1
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      inFlight -= 1
+    })
+
+    await runWithConcurrencyLimit(tasks, concurrencyLimit)
+
+    expect(maxInFlight).toBeLessThanOrEqual(concurrencyLimit)
+  })
+
+  it('throws when limit is lower than 1', async () => {
+    await expect(runWithConcurrencyLimit([], 0)).rejects.toThrow(
+      'concurrencyLimit must be at least 1'
+    )
+  })
+})
+
+describe('fetchElevation signal handling', () => {
+  it('forwards AbortSignal to fetch and handles abort as expected cancellation', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new DOMException('Aborted', 'AbortError'))
+
+    const signal = AbortSignal.abort()
+    const bounds: BoundingBox = {
+      sw: { lat: 0, lng: 0 },
+      ne: { lat: 0.01, lng: 0.01 },
+    }
+
+    const data = await fetchElevation(bounds, 12, signal)
+
+    expect(fetchSpy).toHaveBeenCalled()
+    const secondArg = fetchSpy.mock.calls[0]?.[1] as RequestInit
+    expect(secondArg.signal).toBe(signal)
+    expect(data.width).toBeGreaterThan(0)
+    expect(data.height).toBeGreaterThan(0)
+
   })
 })
