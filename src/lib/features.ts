@@ -14,7 +14,7 @@ export interface GeoFeature {
  * Fetch geographic features from Overpass API (OpenStreetMap).
  * Free, no API key required.
  */
-export async function fetchFeatures(bounds: BoundingBox): Promise<GeoFeature[]> {
+export async function fetchFeatures(bounds: BoundingBox, signal?: AbortSignal): Promise<GeoFeature[]> {
   const { sw, ne } = bounds
   const bbox = `${sw.lat},${sw.lng},${ne.lat},${ne.lng}`
 
@@ -43,7 +43,7 @@ export async function fetchFeatures(bounds: BoundingBox): Promise<GeoFeature[]> 
   const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`
 
   try {
-    const response = await fetch(url)
+    const response = await fetch(url, { signal })
     if (!response.ok) {
       console.warn('Overpass API error:', response.status)
       return []

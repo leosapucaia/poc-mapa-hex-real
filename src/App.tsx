@@ -1,4 +1,4 @@
-import { useState, useCallback, Suspense } from 'react'
+import { useState, useCallback, Suspense, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import maplibregl from 'maplibre-gl'
 import { MapRegionSelector } from './components/MapRegionSelector'
@@ -26,8 +26,19 @@ function App() {
   const [hexGrid, setHexGrid] = useState<HexGrid | null>(null)
   const [mapRef, setMapRef] = useState<maplibregl.Map | null>(null)
   const [statusMsg, setStatusMsg] = useState('')
+  const requestIdRef = useRef(0)
+  const activeAbortRef = useRef<AbortController | null>(null)
 
   const runPipeline = useCallback(async (selection: RegionSelection) => {
+    const requestId = requestIdRef.current + 1
+    requestIdRef.current = requestId
+
+    activeAbortRef.current?.abort()
+    const abortController = new AbortController()
+    activeAbortRef.current = abortController
+
+    const isLatestRequest = () => requestIdRef.current === requestId
+
     setPipelineState('loading')
     setHexGrid(null)
     setStatusMsg('Buscando dados de elevação...')
@@ -37,21 +48,32 @@ function App() {
       const { fetchFeatures } = await import('./lib/features')
       const { generateHexGrid } = await import('./lib/hex-grid')
 
-      const elevationData = await fetchElevation(selection.bounds, 12)
+      const elevationData = await fetchElevation(selection.bounds, 12, abortController.signal)
+      if (!isLatestRequest()) return
       setStatusMsg('Buscando features geográficas...')
 
-      const features = await fetchFeatures(selection.bounds)
+      const features = await fetchFeatures(selection.bounds, abortController.signal)
+      if (!isLatestRequest()) return
       setStatusMsg('Gerando grid hexagonal...')
 
       const grid = generateHexGrid(selection.bounds, elevationData, features, 7)
+      if (!isLatestRequest()) return
 
       setHexGrid(grid)
       setPipelineState('ready')
       setStatusMsg(`${grid.cells.length} hexágonos`)
     } catch (err) {
+      if (!isLatestRequest()) return
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return
+      }
       console.error('Pipeline error:', err)
       setPipelineState('error')
       setStatusMsg(`Erro: ${err instanceof Error ? err.message : 'desconhecido'}`)
+    } finally {
+      if (activeAbortRef.current === abortController) {
+        activeAbortRef.current = null
+      }
     }
   }, [])
 

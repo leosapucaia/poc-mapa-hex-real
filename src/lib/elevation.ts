@@ -20,7 +20,8 @@ export interface ElevationData {
  */
 export async function fetchElevation(
   bounds: BoundingBox,
-  zoom: number = 12
+  zoom: number = 12,
+  signal?: AbortSignal
 ): Promise<ElevationData> {
   const { sw, ne } = bounds
 
@@ -42,8 +43,8 @@ export async function fetchElevation(
   const fetches: Promise<void>[] = []
   for (let ty = minTileY; ty <= maxTileY; ty++) {
     for (let tx = minTileX; tx <= maxTileX; tx++) {
-      fetches.push(
-        fetchTile(tx, ty, zoom, tileSize).then((pixels) => {
+        fetches.push(
+        fetchTile(tx, ty, zoom, tileSize, signal).then((pixels) => {
           if (!pixels) return
           const offsetX = (tx - minTileX) * tileSize
           const offsetY = (ty - minTileY) * tileSize
@@ -115,13 +116,14 @@ async function fetchTile(
   x: number,
   y: number,
   z: number,
-  tileSize: number
+  tileSize: number,
+  signal?: AbortSignal
 ): Promise<Uint8ClampedArray | null> {
   // AWS Open Data Terrain Tiles — Terrarium encoding, free, no key
   const url = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`
 
   try {
-    const response = await fetch(url)
+    const response = await fetch(url, { signal })
     if (!response.ok) return null
 
     const blob = await response.blob()
