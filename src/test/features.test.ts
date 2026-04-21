@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { classifyPoint } from '../lib/features'
+import { buildSpatialFeatureIndex, classifyPoint, preprocessFeatures, queryFeatureCandidates } from '../lib/features'
 import type { GeoFeature } from '../lib/features'
 
 describe('classifyPoint', () => {
@@ -23,5 +23,23 @@ describe('classifyPoint', () => {
 
   it('returns other for empty features', () => {
     expect(classifyPoint(0, 0, [])).toBe('other')
+  })
+
+  it('classifies with spatial index', () => {
+    const index = buildSpatialFeatureIndex([waterFeature], 0.5)
+    expect(classifyPoint(0, 0, index)).toBe('water')
+    expect(classifyPoint(10, 10, index)).toBe('other')
+  })
+
+  it('preprocesses bbox and queries candidate subset', () => {
+    const processed = preprocessFeatures([waterFeature])
+    expect(processed[0].bbox).toEqual({ minLat: -1, minLng: -1, maxLat: 1, maxLng: 1 })
+
+    const index = buildSpatialFeatureIndex([waterFeature], 0.5)
+    const candidatesInside = queryFeatureCandidates(0, 0, index)
+    const candidatesOutside = queryFeatureCandidates(10, 10, index)
+
+    expect(candidatesInside.length).toBe(1)
+    expect(candidatesOutside.length).toBe(0)
   })
 })

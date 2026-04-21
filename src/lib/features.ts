@@ -10,6 +10,23 @@ export interface GeoFeature {
   tags: Record<string, string>
 }
 
+export interface FeatureBbox {
+  minLat: number
+  minLng: number
+  maxLat: number
+  maxLng: number
+}
+
+export interface GeoFeatureWithBbox extends GeoFeature {
+  bbox: FeatureBbox
+}
+
+export interface SpatialFeatureIndex {
+  cellSizeDeg: number
+  features: GeoFeatureWithBbox[]
+  buckets: Map<string, GeoFeatureWithBbox[]>
+}
+
 /**
  * Fetch geographic features from Overpass API (OpenStreetMap).
  * Free, no API key required.
@@ -57,6 +74,56 @@ export async function fetchFeatures(bounds: BoundingBox, signal?: AbortSignal): 
   }
 }
 
+/** Pre-process features to include geometry bounding boxes. */
+export function preprocessFeatures(features: GeoFeature[]): GeoFeatureWithBbox[] {
+  return features.map((feature) => ({
+    ...feature,
+    bbox: getGeometryBbox(feature.geometry),
+  }))
+}
+
+/** Build a simple grid spatial index to speed up point queries. */
+export function buildSpatialFeatureIndex(
+  features: GeoFeature[],
+  cellSizeDeg: number = 0.02
+): SpatialFeatureIndex {
+  const processed = preprocessFeatures(features)
+  const buckets = new Map<string, GeoFeatureWithBbox[]>()
+
+  for (const feature of processed) {
+    const minX = Math.floor(feature.bbox.minLng / cellSizeDeg)
+    const maxX = Math.floor(feature.bbox.maxLng / cellSizeDeg)
+    const minY = Math.floor(feature.bbox.minLat / cellSizeDeg)
+    const maxY = Math.floor(feature.bbox.maxLat / cellSizeDeg)
+
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        const key = `${x}:${y}`
+        const bucket = buckets.get(key)
+        if (bucket) {
+          bucket.push(feature)
+        } else {
+          buckets.set(key, [feature])
+        }
+      }
+    }
+  }
+
+  return { cellSizeDeg, features: processed, buckets }
+}
+
+/** Query candidate features around a point using a spatial index. */
+export function queryFeatureCandidates(
+  lat: number,
+  lng: number,
+  index: SpatialFeatureIndex
+): GeoFeatureWithBbox[] {
+  const x = Math.floor(lng / index.cellSizeDeg)
+  const y = Math.floor(lat / index.cellSizeDeg)
+  const key = `${x}:${y}`
+  return index.buckets.get(key) ?? []
+}
+
 /**
  * Classify a point (lat, lng) based on features.
  * Returns the most specific category, or 'other'.
@@ -64,10 +131,14 @@ export async function fetchFeatures(bounds: BoundingBox, signal?: AbortSignal): 
 export function classifyPoint(
   lat: number,
   lng: number,
-  features: GeoFeature[]
+  featureSource: GeoFeature[] | SpatialFeatureIndex
 ): TerrainCategory {
+  const candidates = Array.isArray(featureSource)
+    ? featureSource
+    : queryFeatureCandidates(lat, lng, featureSource)
+
   // Check in priority order (most specific first)
-  for (const feature of features) {
+  for (const feature of candidates) {
     if (pointInGeometry(lat, lng, feature.geometry)) {
       return feature.category
     }
@@ -135,6 +206,40 @@ function classifyTags(tags: Record<string, string>): TerrainCategory {
     return 'road'
   }
   return 'other'
+}
+
+function getGeometryBbox(geometry: GeoJSON.Geometry): FeatureBbox {
+  const points: [number, number][] = []
+
+  if (geometry.type === 'Polygon') {
+    for (const ring of geometry.coordinates) {
+      for (const [lng, lat] of ring) {
+        points.push([lng, lat])
+      }
+    }
+  } else if (geometry.type === 'LineString') {
+    for (const [lng, lat] of geometry.coordinates) {
+      points.push([lng, lat])
+    }
+  }
+
+  if (points.length === 0) {
+    return { minLat: 0, minLng: 0, maxLat: 0, maxLng: 0 }
+  }
+
+  let minLng = points[0][0]
+  let maxLng = points[0][0]
+  let minLat = points[0][1]
+  let maxLat = points[0][1]
+
+  for (const [lng, lat] of points) {
+    minLng = Math.min(minLng, lng)
+    maxLng = Math.max(maxLng, lng)
+    minLat = Math.min(minLat, lat)
+    maxLat = Math.max(maxLat, lat)
+  }
+
+  return { minLat, minLng, maxLat, maxLng }
 }
 
 /**
