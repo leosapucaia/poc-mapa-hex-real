@@ -26,6 +26,12 @@ export interface HexGrid {
   bounds: BoundingBox
 }
 
+export interface HexGridProgress {
+  phase: 'indexing-features' | 'classifying-cells'
+  processed: number
+  total: number
+}
+
 /**
  * Generate a hex grid covering the given bounds using h3-js.
  * Each cell is sampled for elevation and terrain.
@@ -34,7 +40,8 @@ export function generateHexGrid(
   bounds: BoundingBox,
   elevationData: ElevationData,
   features: GeoFeature[],
-  resolution: number = 7
+  resolution: number = 7,
+  onProgress?: (progress: HexGridProgress) => void
 ): HexGrid {
   const { sw, ne } = bounds
   const centerLat = (sw.lat + ne.lat) / 2
@@ -57,12 +64,15 @@ export function generateHexGrid(
   const h3Indices = gridDisk(centerH3, hexRadius)
 
   // Build spatial index once and query candidates per cell center
+  onProgress?.({ phase: 'indexing-features', processed: 0, total: features.length })
   const featureIndex = buildSpatialFeatureIndex(features)
+  onProgress?.({ phase: 'indexing-features', processed: features.length, total: features.length })
 
   // Filter to cells within bounds and sample data
   const cells: HexCell[] = []
 
-  for (const h3Index of h3Indices) {
+  for (let i = 0; i < h3Indices.length; i++) {
+    const h3Index = h3Indices[i]
     const boundary = cellToBoundary(h3Index)
     const cellCenter = getCellCenter(boundary)
 
@@ -88,6 +98,13 @@ export function generateHexGrid(
       terrain,
       isWater,
     })
+    if ((i + 1) % 200 === 0 || i + 1 === h3Indices.length) {
+      onProgress?.({
+        phase: 'classifying-cells',
+        processed: i + 1,
+        total: h3Indices.length,
+      })
+    }
   }
 
   return { cells, resolution, bounds }
