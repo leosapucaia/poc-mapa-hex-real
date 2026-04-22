@@ -1,10 +1,11 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RegionSelection } from '../lib/types'
 import type { HexGrid } from '../lib/hex-grid'
 import { generateHexGrid } from '../lib/hex-grid'
 import type { PipelineConfig, PipelineState } from '../domain/contracts/pipeline'
 import { ElevationService } from '../domain/services/ElevationService'
 import { FeatureService } from '../domain/services/FeatureService'
+import { BackendHexGridService } from '../domain/services/BackendHexGridService'
 import type { WorkerRequestMessage, WorkerResponseMessage } from '../workers/pipeline.worker.types'
 
 const DEFAULT_CONFIG: PipelineConfig = {
@@ -12,6 +13,25 @@ const DEFAULT_CONFIG: PipelineConfig = {
   hexResolution: 7,
   retries: 2,
   retryDelayMs: 500,
+}
+
+interface PipelineRuntimeMetrics {
+  localLatencies: number[]
+  backendLatencies: number[]
+  backendErrors: number
+  backendRequests: number
+}
+
+interface HybridBackendConfig {
+  enabled: boolean
+  endpoint: string
+}
+
+function getPercentile(values: number[], percentile: number): number {
+  if (values.length === 0) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  const index = Math.min(sorted.length - 1, Math.floor((percentile / 100) * sorted.length))
+  return sorted[index]
 }
 
 function sleep(ms: number): Promise<void> {
@@ -70,6 +90,10 @@ async function measureUiResponsiveness<T>(task: () => Promise<T>): Promise<{ res
 
 export function usePipelineController(config?: Partial<PipelineConfig>) {
   const mergedConfig = useMemo(() => ({ ...DEFAULT_CONFIG, ...config }), [config])
+  const backendMode = useMemo(
+    () => config?.backendMode ?? { enabled: false, endpoint: '/api/hex-grid' },
+    [config?.backendMode]
+  )
 
   const [pipelineState, setPipelineState] = useState<PipelineState>('idle')
   const [hexGrid, setHexGrid] = useState<HexGrid | null>(null)
@@ -79,7 +103,28 @@ export function usePipelineController(config?: Partial<PipelineConfig>) {
   const activeAbortRef = useRef<AbortController | null>(null)
   const elevationServiceRef = useRef(new ElevationService())
   const featureServiceRef = useRef(new FeatureService())
+  const backendServiceRef = useRef(new BackendHexGridService())
   const workerRef = useRef<Worker | null>(null)
+  const hybridBackendRef = useRef<HybridBackendConfig>({
+    enabled: false,
+    endpoint: '/api/hex-grid',
+  })
+  const metricsRef = useRef<PipelineRuntimeMetrics>({
+    localLatencies: [],
+    backendLatencies: [],
+    backendErrors: 0,
+    backendRequests: 0,
+  })
+
+  useEffect(() => {
+    hybridBackendRef.current = {
+      enabled: backendMode.enabled,
+      endpoint: backendMode.endpoint,
+    }
+    backendServiceRef.current = new BackendHexGridService({
+      endpoint: backendMode.endpoint,
+    })
+  }, [backendMode.enabled, backendMode.endpoint])
 
   const cancel = useCallback(() => {
     activeAbortRef.current?.abort()
@@ -208,10 +253,12 @@ export function usePipelineController(config?: Partial<PipelineConfig>) {
       )
       if (!isLatestRequest()) return
 
-      setStatusMsg('Gerando grid hexagonal (worker)...')
+      setStatusMsg('Gerando grid hexagonal local-first (worker)...')
+      const localStart = performance.now()
       const measured = await measureUiResponsiveness(() =>
         runGridWithFallback(String(requestId), selection, elevationData, features)
       )
+      metricsRef.current.localLatencies.push(performance.now() - localStart)
       if (!isLatestRequest()) return
 
       setHexGrid(measured.result.grid)
@@ -219,7 +266,40 @@ export function usePipelineController(config?: Partial<PipelineConfig>) {
       setStatusMsg(
         `${measured.result.grid.cells.length} hexágonos | modo=${measured.result.mode} | FPS≈${measured.fpsEstimate.toFixed(1)} | input≈${measured.inputLatencyMs.toFixed(1)}ms`
       )
+      console.info('[pipeline:local-observability]', {
+        p50LatencyMs: getPercentile(metricsRef.current.localLatencies, 50).toFixed(1),
+        p95LatencyMs: getPercentile(metricsRef.current.localLatencies, 95).toFixed(1),
+      })
     } catch (err) {
+      if (hybridBackendRef.current.enabled) {
+        const backendStart = performance.now()
+        metricsRef.current.backendRequests += 1
+        setStatusMsg('Falha local. Tentando backend de grid...')
+        try {
+          const grid = await backendServiceRef.current.fetchGrid(
+            selection,
+            mergedConfig.hexResolution,
+            abortController.signal
+          )
+          metricsRef.current.backendLatencies.push(performance.now() - backendStart)
+          if (!isLatestRequest()) return
+          setHexGrid(grid)
+          setPipelineState('ready')
+          setStatusMsg(`${grid.cells.length} hexágonos | modo=backend-fallback`)
+          console.info('[pipeline:backend-observability]', {
+            p50LatencyMs: getPercentile(metricsRef.current.backendLatencies, 50).toFixed(1),
+            p95LatencyMs: getPercentile(metricsRef.current.backendLatencies, 95).toFixed(1),
+            errorRate: metricsRef.current.backendRequests === 0
+              ? 0
+              : Number((metricsRef.current.backendErrors / metricsRef.current.backendRequests).toFixed(3)),
+          })
+          return
+        } catch (backendError) {
+          metricsRef.current.backendErrors += 1
+          console.error('Backend fallback error:', backendError)
+        }
+      }
+
       if (!isLatestRequest()) return
       if (err instanceof DOMException && err.name === 'AbortError') {
         return

@@ -52,6 +52,13 @@ POC para provar viabilidade de renderizar regiões reais como mapa hexagonal est
 - **Decisão**: Renderizar em plano XY com câmera em Z, não como globo
 - **Razão**: Mais intuitivo para regiões reais, alinha com conceito de mapa, simplifica matemática
 
+### 8. Camada opcional de backend (modo híbrido)
+- **Decisão**: Adotar estratégia `local-first` no frontend, com fallback opcional para backend quando o pipeline local falhar
+- **Razão**: Mantém baixa latência para áreas comuns e adiciona resiliência para seleções grandes/recorrentes
+- **Contrato inicial**: Request `{bbox, resolution, options}` e response versionada `v1`
+- **Cache key**: `hex:v1:<resolution>:<swLat4>,<swLng4>:<neLat4>,<neLng4>`
+- **Observabilidade**: acompanhar p50/p95 de latência e taxa de erro (local e fallback backend)
+
 ## Risks / Trade-offs
 
 - **Performance com regiões grandes**: Grid de 50k+ células pode ser pesado. Mitigar com LOD ou limite de área.

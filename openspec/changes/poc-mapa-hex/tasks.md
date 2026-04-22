@@ -64,3 +64,10 @@
 - [ ] 8.4 Pre-select a default region (e.g., Rio de Janeiro) for instant demo
 - [ ] 8.5 Performance test with 5000+ cells, optimize if < 30 FPS
 - [ ] 8.6 Final visual polish: shadows, ambient occlusion, anti-aliasing
+
+## 9. Optional backend for large/recurrent selections (Hybrid)
+
+- [x] 9.1 Define backend request payload `{bbox, resolution, options}` and versioned response schema for hex grid (`v1`)
+- [x] 9.2 Specify geospatial+resolution cache key strategy and initial TTL policy
+- [x] 9.3 Add invalidation and observability strategy (latency p50/p95, error rate)
+- [x] 9.4 Start frontend hybrid mode: local-first generation with optional backend fallback
